@@ -4,32 +4,15 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import threading
 import time
-from collections import defaultdict
-
-
-def read_data():
-    numbers = []
-    statuses = []
-    x_coords = []
-    y_coords = []
-
-    with open('data.txt', 'r') as file:
-        for line in file:
-            data = line.strip().split(',')
-            if len(data) == 4:
-                numbers.append(int(data[0]))
-                statuses.append(int(data[1]))
-                x_coords.append(float(data[2]))
-                y_coords.append(float(data[3]))
-
-    return numbers, statuses, x_coords, y_coords
+from collections import deque
+import numpy as np
 
 
 class DataVisualization:
     def __init__(self, master):
         self.master = master
         self.master.title("Data Visualization")
-        self.master.geometry("1920x1200")
+        self.master.geometry("800x600")
 
         self.figure, self.ax = plt.subplots(figsize=(8, 6))
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.master)
@@ -51,7 +34,25 @@ class DataVisualization:
         self.update_thread.daemon = True
         self.update_thread.start()
 
-        self.trajectories = defaultdict(list)  # 用于存储每个物体的轨迹
+        self.max_trajectory_length = 10  # 设置最大轨迹长度
+        self.trajectories = {}  # 用于存储每个物体的轨迹
+
+    def read_data(self):
+        numbers = []
+        statuses = []
+        x_coords = []
+        y_coords = []
+
+        with open('data.txt', 'r') as file:
+            for line in file:
+                data = line.strip().split(',')
+                if len(data) == 4:
+                    numbers.append(int(data[0]))
+                    statuses.append(int(data[1]))
+                    x_coords.append(float(data[2]))
+                    y_coords.append(float(data[3]))
+
+        return numbers, statuses, x_coords, y_coords
 
     def plot_data(self, numbers, statuses, x_coords, y_coords):
         self.ax.clear()
@@ -78,10 +79,18 @@ class DataVisualization:
                                      textcoords='offset points', fontsize=8, color=style['color'])
 
                     # 更新轨迹
+                    if number not in self.trajectories:
+                        self.trajectories[number] = deque(maxlen=self.max_trajectory_length)
                     self.trajectories[number].append((x_coords[i], y_coords[i]))
                     if len(self.trajectories[number]) > 1:
-                        traj = self.trajectories[number]
-                        self.ax.plot(*zip(*traj), color=style['color'], alpha=0.3, linewidth=1)
+                        traj = list(self.trajectories[number])
+                        # 创建颜色渐变
+                        colors = np.ones((len(traj), 4))
+                        colors[:, :3] = plt.cm.colors.to_rgb(style['color'])
+                        colors[:, 3] = np.linspace(0.1, 1, len(traj))
+
+                        for j in range(len(traj) - 1):
+                            self.ax.plot(*zip(traj[j], traj[j + 1]), color=colors[j], alpha=colors[j, 3], linewidth=1)
 
                     break
 
@@ -106,7 +115,7 @@ class DataVisualization:
         self.canvas.draw()
 
     def update_data(self):
-        numbers, statuses, x_coords, y_coords = read_data()
+        numbers, statuses, x_coords, y_coords = self.read_data()
         self.plot_data(numbers, statuses, x_coords, y_coords)
 
     def toggle_auto_update(self):
