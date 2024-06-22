@@ -4,32 +4,33 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import threading
 import time
-from collections import defaultdict
+from collections import deque
+import numpy as np
+import math
 
 
-def read_data():
-    numbers = []
-    statuses = []
-    x_coords = []
-    y_coords = []
+def haversine(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points
+    on the earth (specified in decimal degrees)
+    """
+    # 将十进制度数转化为弧度
+    lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
 
-    with open('data.txt', 'r') as file:
-        for line in file:
-            data = line.strip().split(',')
-            if len(data) == 4:
-                numbers.append(int(data[0]))
-                statuses.append(int(data[1]))
-                x_coords.append(float(data[2]))
-                y_coords.append(float(data[3]))
-
-    return numbers, statuses, x_coords, y_coords
+    # haversine公式
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.asin(math.sqrt(a))
+    r = 6371  # 地球平均半径，单位为公里
+    return c * r * 1000  # 转换为米
 
 
 class DataVisualization:
     def __init__(self, master):
         self.master = master
         self.master.title("Data Visualization")
-        self.master.geometry("1920x1200")
+        self.master.geometry("800x600")
 
         self.figure, self.ax = plt.subplots(figsize=(8, 6))
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.master)
@@ -51,7 +52,45 @@ class DataVisualization:
         self.update_thread.daemon = True
         self.update_thread.start()
 
-        self.trajectories = defaultdict(list)  # 用于存储每个物体的轨迹
+        self.max_trajectory_length = 10  # 设置最大轨迹长度
+        self.trajectories = {}  # 用于存储每个物体的轨迹
+        self.origin = None  # 用于存储原点的经纬度
+
+    def read_data(self):
+        numbers = []
+        statuses = []
+        lons = []
+        lats = []
+
+        with open('data.txt', 'r') as file:
+            for line in file:
+                data = line.strip().split(',')
+                if len(data) == 4:
+                    numbers.append(int(data[0]))
+                    statuses.append(int(data[1]))
+                    lons.append(float(data[2]))
+                    lats.append(float(data[3]))
+
+        return numbers, statuses, lons, lats
+
+    def convert_to_meters(self, lons, lats):
+        if self.origin is None:
+            # 设置原点为第一个数据点（假设是左下角的物体）
+            self.origin = (lons[0], lats[0])
+
+        x_coords = []
+        y_coords = []
+        for lon, lat in zip(lons, lats):
+            x = haversine(self.origin[0], self.origin[1], lon, self.origin[1])
+            y = haversine(self.origin[0], self.origin[1], self.origin[0], lat)
+            if lon < self.origin[0]:
+                x = -x
+            if lat < self.origin[1]:
+                y = -y
+            x_coords.append(x)
+            y_coords.append(y)
+
+        return x_coords, y_coords
 
     def plot_data(self, numbers, statuses, x_coords, y_coords):
         self.ax.clear()
@@ -78,10 +117,18 @@ class DataVisualization:
                                      textcoords='offset points', fontsize=8, color=style['color'])
 
                     # 更新轨迹
+                    if number not in self.trajectories:
+                        self.trajectories[number] = deque(maxlen=self.max_trajectory_length)
                     self.trajectories[number].append((x_coords[i], y_coords[i]))
                     if len(self.trajectories[number]) > 1:
-                        traj = self.trajectories[number]
-                        self.ax.plot(*zip(*traj), color=style['color'], alpha=0.3, linewidth=1)
+                        traj = list(self.trajectories[number])
+                        # 创建颜色渐变
+                        colors = np.ones((len(traj), 4))
+                        colors[:, :3] = plt.cm.colors.to_rgb(style['color'])
+                        colors[:, 3] = np.linspace(0.1, 1, len(traj))
+
+                        for j in range(len(traj) - 1):
+                            self.ax.plot(*zip(traj[j], traj[j + 1]), color=colors[j], alpha=colors[j, 3], linewidth=1)
 
                     break
 
@@ -94,19 +141,20 @@ class DataVisualization:
                 self.ax.scatter(x, y, marker=style['marker'], c=style['color'], alpha=0.3,
                                 label=f'{vehicle_type} (Dead)')
 
-        self.ax.set_title('Object Visualization (Relative Coordinates)')
-        self.ax.set_xlabel('X')
-        self.ax.set_ylabel('Y')
+        self.ax.set_title('Object Visualization (Meters from Origin)')
+        self.ax.set_xlabel('X (m)')
+        self.ax.set_ylabel('Y (m)')
         self.ax.grid(True)
         self.ax.legend()
 
-        self.ax.set_xlim(0, 100)  # 假设坐标范围是0-100
-        self.ax.set_ylim(0, 100)
+        self.ax.set_xlim(min(x_coords) - 100, max(x_coords) + 100)
+        self.ax.set_ylim(min(y_coords) - 100, max(y_coords) + 100)
 
         self.canvas.draw()
 
     def update_data(self):
-        numbers, statuses, x_coords, y_coords = read_data()
+        numbers, statuses, lons, lats = self.read_data()
+        x_coords, y_coords = self.convert_to_meters(lons, lats)
         self.plot_data(numbers, statuses, x_coords, y_coords)
 
     def toggle_auto_update(self):
