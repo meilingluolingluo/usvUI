@@ -38,13 +38,13 @@ def create_vehicles(num_usv, num_auv, num_uav):
     vehicles = []
     for i in range(1, num_usv + 1):
         vehicles.append(Vehicle(i, random.uniform(0, 100), random.uniform(0, 100),
-                                random.uniform(5, 15), random.uniform(0, 2 * math.pi)))
+                                random.uniform(50, 150), random.uniform(0, 2 * math.pi)))
     for i in range(101, 101 + num_auv):
         vehicles.append(Vehicle(i, random.uniform(0, 100), random.uniform(0, 100),
-                                random.uniform(3, 10), random.uniform(0, 2 * math.pi)))
+                                random.uniform(30, 100), random.uniform(0, 2 * math.pi)))
     for i in range(201, 201 + num_uav):
         vehicles.append(Vehicle(i, random.uniform(0, 100), random.uniform(0, 100),
-                                random.uniform(20, 50), random.uniform(0, 2 * math.pi)))
+                                random.uniform(200, 500), random.uniform(0, 2 * math.pi)))
     return vehicles
 
 
@@ -54,7 +54,7 @@ def simulate(vehicles, duration, interval):
         with open('data.txt', 'w') as file:
             for vehicle in vehicles:
                 vehicle.move()
-                if random.random() < 0.01:  # 极小概率损毁
+                if random.random() < 0.001:  # 极小概率损毁
                     vehicle.status = 0
                 file.write(str(vehicle) + '\n')
         time.sleep(interval)
@@ -62,4 +62,4 @@ def simulate(vehicles, duration, interval):
 
 if __name__ == "__main__":
     vehicles = create_vehicles(5, 10, 5)  # 创建 5 个 USV，3 个 AUV，2 个 UAV
-    simulate(vehicles, 3600, 1)  # 模拟 1 小时，每秒更新一次
+    simulate(vehicles, 3600, 0.1)  # 模拟 1 小时，每秒更新一次

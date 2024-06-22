@@ -70,7 +70,7 @@ class DataVisualization:
         self.update_thread.daemon = True
         self.update_thread.start()
 
-        self.max_trajectory_length = 50  # 设置最大轨迹长度
+        self.max_trajectory_length = 20  # 设置最大轨迹长度
         self.trajectories = {}  # 用于存储每个物体的轨迹
         self.origin = None  # 用于存储原点的经纬度
 
