@@ -26,11 +26,29 @@ def haversine(lon1, lat1, lon2, lat2):
     return c * r * 1000  # 转换为米
 
 
+def read_data():
+    numbers = []
+    statuses = []
+    lons = []
+    lats = []
+
+    with open('data.txt', 'r') as file:
+        for line in file:
+            data = line.strip().split(',')
+            if len(data) == 4:
+                numbers.append(int(data[0]))
+                statuses.append(int(data[1]))
+                lons.append(float(data[2]))
+                lats.append(float(data[3]))
+
+    return numbers, statuses, lons, lats
+
+
 class DataVisualization:
     def __init__(self, master):
         self.master = master
         self.master.title("Data Visualization")
-        self.master.geometry("800x600")
+        self.master.geometry("1200x800")
 
         self.figure, self.ax = plt.subplots(figsize=(8, 6))
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.master)
@@ -52,26 +70,9 @@ class DataVisualization:
         self.update_thread.daemon = True
         self.update_thread.start()
 
-        self.max_trajectory_length = 10  # 设置最大轨迹长度
+        self.max_trajectory_length = 50  # 设置最大轨迹长度
         self.trajectories = {}  # 用于存储每个物体的轨迹
         self.origin = None  # 用于存储原点的经纬度
-
-    def read_data(self):
-        numbers = []
-        statuses = []
-        lons = []
-        lats = []
-
-        with open('data.txt', 'r') as file:
-            for line in file:
-                data = line.strip().split(',')
-                if len(data) == 4:
-                    numbers.append(int(data[0]))
-                    statuses.append(int(data[1]))
-                    lons.append(float(data[2]))
-                    lats.append(float(data[3]))
-
-        return numbers, statuses, lons, lats
 
     def convert_to_meters(self, lons, lats):
         if self.origin is None:
@@ -141,19 +142,29 @@ class DataVisualization:
                 self.ax.scatter(x, y, marker=style['marker'], c=style['color'], alpha=0.3,
                                 label=f'{vehicle_type} (Dead)')
 
-        self.ax.set_title('Object Visualization (Meters from Origin)')
+        self.ax.set_title('USV Visualization')
         self.ax.set_xlabel('X (m)')
         self.ax.set_ylabel('Y (m)')
         self.ax.grid(True)
         self.ax.legend()
 
-        self.ax.set_xlim(min(x_coords) - 100, max(x_coords) + 100)
-        self.ax.set_ylim(min(y_coords) - 100, max(y_coords) + 100)
+        # 动态调整 x 轴和 y 轴的范围
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        margin = max(x_range, y_range) * 0.1  # 添加 10% 的边距
+
+        self.ax.set_xlim(x_min - margin, x_max + margin)
+        self.ax.set_ylim(y_min - margin, y_max + margin)
+
+        # 保持宽高比为 1:1
+        #self.ax.set_aspect('equal', 'box')
 
         self.canvas.draw()
 
     def update_data(self):
-        numbers, statuses, lons, lats = self.read_data()
+        numbers, statuses, lons, lats = read_data()
         x_coords, y_coords = self.convert_to_meters(lons, lats)
         self.plot_data(numbers, statuses, x_coords, y_coords)
 
@@ -168,7 +179,7 @@ class DataVisualization:
         while True:
             if self.auto_update:
                 self.update_data()
-            time.sleep(30)
+            time.sleep(1)
 
 
 if __name__ == "__main__":
