@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import threading
 import time
+from collections import defaultdict
 
 
 def read_data():
@@ -20,10 +21,6 @@ def read_data():
                 statuses.append(int(data[1]))
                 x_coords.append(float(data[2]))
                 y_coords.append(float(data[3]))
-
-    min_x, min_y = min(x_coords), min(y_coords)
-    x_coords = [x - min_x for x in x_coords]
-    y_coords = [y - min_y for y in y_coords]
 
     return numbers, statuses, x_coords, y_coords
 
@@ -54,6 +51,8 @@ class DataVisualization:
         self.update_thread.daemon = True
         self.update_thread.start()
 
+        self.trajectories = defaultdict(list)  # 用于存储每个物体的轨迹
+
     def plot_data(self, numbers, statuses, x_coords, y_coords):
         self.ax.clear()
 
@@ -77,6 +76,13 @@ class DataVisualization:
 
                     self.ax.annotate(str(number), (x_coords[i], y_coords[i]), xytext=(5, 5),
                                      textcoords='offset points', fontsize=8, color=style['color'])
+
+                    # 更新轨迹
+                    self.trajectories[number].append((x_coords[i], y_coords[i]))
+                    if len(self.trajectories[number]) > 1:
+                        traj = self.trajectories[number]
+                        self.ax.plot(*zip(*traj), color=style['color'], alpha=0.3, linewidth=1)
+
                     break
 
         for vehicle_type, style in styles.items():
@@ -94,8 +100,8 @@ class DataVisualization:
         self.ax.grid(True)
         self.ax.legend()
 
-        self.ax.set_xlim(-0.001, max(x_coords) + 0.001)
-        self.ax.set_ylim(-0.001, max(y_coords) + 0.001)
+        self.ax.set_xlim(0, 100)  # 假设坐标范围是0-100
+        self.ax.set_ylim(0, 100)
 
         self.canvas.draw()
 
